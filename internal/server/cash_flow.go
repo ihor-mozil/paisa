@@ -5,6 +5,7 @@ import (
 
 	"github.com/ananthakumaran/paisa/internal/accounting"
 	"github.com/ananthakumaran/paisa/internal/query"
+	"github.com/ananthakumaran/paisa/internal/service"
 	"github.com/ananthakumaran/paisa/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -31,7 +32,9 @@ func GetCashFlow(db *gorm.DB) gin.H {
 }
 
 func GetCurrentCashFlow(db *gorm.DB) []CashFlow {
-	balance := accounting.CostSum(query.Init(db).BeforeNMonths(3).AccountPrefix("Assets:Checking").All())
+	ps := query.Init(db).BeforeNMonths(3).AccountPrefix("Assets:Checking").All()
+	ps = service.PopulateMarketPrice(db, ps)
+	balance := accounting.CurrentBalance(ps)
 	return computeCashFlow(db, query.Init(db).LastNMonths(3), balance)
 }
 
@@ -82,7 +85,8 @@ func computeCashFlow(db *gorm.DB, q *query.Query, balance decimal.Decimal) []Cas
 
 		ps, ok = checkings[key]
 		if ok {
-			cashFlow.Checking = accounting.CostSum(ps)
+			ps = service.PopulateMarketPrice(db, ps)
+			cashFlow.Checking = accounting.CurrentBalance(ps)
 		}
 
 		balance = balance.Add(cashFlow.Checking)

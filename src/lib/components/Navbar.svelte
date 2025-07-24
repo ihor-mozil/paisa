@@ -77,7 +77,8 @@
       children: [
         { label: "Monthly", href: "/monthly", monthPicker: true, dateRangeSelector: true },
         { label: "Yearly", href: "/yearly", financialYearPicker: true },
-        { label: "Budget", href: "/budget", help: "budget", monthPicker: true }
+        // { label: "Budget", href: "/budget", help: "budget", monthPicker: true },
+        { label: "Budget", href: "/budget_custom", help: "budget", monthPicker: true }
       ]
     },
     {
@@ -102,7 +103,7 @@
         { label: "Interest", href: "/interest" }
       ]
     },
-    { label: "Income", href: "/income" },
+    { label: "Income", href: "/income", dateRangeSelector: true },
     {
       label: "Ledger",
       href: "/ledger",

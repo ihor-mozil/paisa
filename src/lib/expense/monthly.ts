@@ -7,6 +7,7 @@ import {
   formatFixedWidthFloat,
   formatCurrency,
   formatCurrencyCrude,
+  formatPercentage,
   type Posting,
   skipTicks,
   tooltip,
@@ -234,19 +235,24 @@ export function renderMonthlyExpensesTimeline(
     return (d: d3.SeriesPoint<Record<string, number>>) => {
       let grandTotal = 0;
       return tooltip(
-        _.flatMap(allowedGroups, (key) => {
+        _.chain(allowedGroups)
+         .flatMap((key) => {
           const total = (d.data as any)[key];
           if (total > 0) {
             grandTotal += total;
-            return [
-              [
-                iconify(key, { group: "Expenses" }),
-                [formatCurrency(total), "has-text-weight-bold has-text-right"]
-              ]
-            ];
           }
-          return [];
-        }),
+          return {
+            account: key,
+            amount: total
+          };
+         })
+         .sort((v1, v2) => v2.amount - v1.amount )
+         .map((v) => [
+          iconify(v.account, { group: "Expenses" }),
+          [formatCurrency(v.amount), "has-text-weight-bold has-text-right"],
+          [formatPercentage(v.amount / grandTotal, 2), "has-text-weight-bold has-text-right"]
+        ])
+         .value(),
         { total: formatCurrency(grandTotal), header: (d.data.timestamp as any).format("MMM YYYY") }
       );
     };
@@ -473,16 +479,33 @@ export function renderCurrentExpensesBreakdown(z: d3.ScaleOrdinal<string, string
       .transition(t)
       .call(d3.axisLeft(y).tickFormat((g) => iconify(g, { group: "Expenses", suffix: true })));
 
+      const ComputeTooltip = (d: Point): Array<Array<string | string[]>> => {
+        const total = _.sum(_.map(d.postings, (p) => p.amount))
+        return _.chain(d.postings)
+          .groupBy((p) => p.payee)
+          .map((group, payee) => {
+            return {
+              payee: payee,
+              count: group.length,
+              amount: _.sum(_.map(group, (p) => p.amount)),
+              pct: _.sum(_.map(group, (p) => p.amount)) / total
+            };
+          })
+          .sort((p1, p2) => p2.amount - p1.amount)
+          .map((p) => [
+            [p.payee, "is-clipped"],
+            [`${p.count}`, "has-text-right"],
+            [formatCurrency(p.amount), "has-text-weight-bold has-text-right"],
+            [formatPercentage(p.pct, 2), "has-text-weight-bold has-text-right"]
+          ])
+          .value();
+      };
+    
+
     const tooltipContent = (d: Point) => {
       const total = _.sumBy(d.postings, (p) => p.amount);
       return tooltip(
-        d.postings.map((p) => {
-          return [
-            p.date.format("DD MMM YYYY"),
-            [p.payee, "is-clipped"],
-            [formatCurrency(p.amount), "has-text-weight-bold has-text-right"]
-          ];
-        }),
+        ComputeTooltip(d),
         {
           total: formatCurrency(total),
           header: `${d.postings[0].date.format("MMM YYYY")} ${d.category}`

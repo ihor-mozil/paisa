@@ -233,8 +233,8 @@ export interface Income {
 }
 
 export interface Tax {
-  start_date: string;
-  end_date: string;
+  start_date: dayjs.Dayjs;
+  end_date: dayjs.Dayjs;
   postings: Posting[];
 }
 
@@ -630,6 +630,12 @@ export function ajax(route: "/api/expense"): Promise<{
 }>;
 
 export function ajax(route: "/api/budget"): Promise<{
+  budgetsByMonth: { [key: string]: Budget };
+  checkingBalance: number;
+  availableForBudgeting: number;
+}>;
+
+export function ajax(route: "/api/budget_custom"): Promise<{
   budgetsByMonth: { [key: string]: Budget };
   checkingBalance: number;
   availableForBudgeting: number;

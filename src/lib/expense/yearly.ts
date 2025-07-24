@@ -81,13 +81,21 @@ export function renderCalendar(
       .value();
     const total = _.sumBy(es, (p) => p.amount);
     return tooltip(
-      _.map(byAccount, (amount, group) => {
-        return [
-          [iconify(group, { group: "Expenses" })],
-          [formatPercentage(amount / total, 1), "has-text-right"],
-          [formatCurrency(amount), "has-text-weight-bold has-text-right"]
-        ];
-      }),
+      _.chain(byAccount)
+      .map((amount, group) => {
+        return {
+          group,
+          amount
+        }
+      })
+      .sort((v1, v2) => v2.amount - v1.amount)
+      .map((v) => [
+          [iconify(v.group, { group: "Expenses" })],
+          [formatCurrency(v.amount), "has-text-weight-bold has-text-right"],
+          [formatPercentage(v.amount / total, 1), "has-text-right"]
+        ]
+      )
+      .value(),
       { total: formatCurrency(total), header: es[0].date.format("MMM YYYY") }
     );
   };
@@ -220,19 +228,24 @@ export function renderYearlyExpensesTimeline(
     return (d: d3.SeriesPoint<Record<string, number>>) => {
       let grandTotal = 0;
       return tooltip(
-        _.flatMap(allowedGroups, (key) => {
+        _.chain(allowedGroups)
+        .flatMap((key) => {
           const total = (d.data as any)[key];
           if (total > 0) {
             grandTotal += total;
-            return [
-              [
-                iconify(key, { group: "Expenses" }),
-                [formatCurrency(total), "has-text-weight-bold has-text-right"]
-              ]
-            ];
           }
-          return [];
-        }),
+          return {
+            key,
+            total
+          };
+        })
+        .sort((v1, v2) => v2.total - v1.total)
+        .map(v => [
+          iconify(v.key, { group: "Expenses" }),
+          [formatCurrency(v.total), "has-text-weight-bold has-text-right"],
+          [formatPercentage(v.total/ grandTotal), "has-text-weight-bold has-text-right"]
+        ])
+        .value(),
         {
           total: formatCurrency(grandTotal),
           header: financialYear(d.data.timestamp as any)
@@ -422,8 +435,8 @@ export function renderCurrentExpensesBreakdown(z: d3.ScaleOrdinal<string, string
         _.map(byMonth, (amount, month) => {
           return [
             month,
-            [formatPercentage(amount / total, 1), "has-text-right"],
-            [formatCurrency(amount), "has-text-weight-bold has-text-right"]
+            [formatCurrency(amount), "has-text-weight-bold has-text-right"],
+            [formatPercentage(amount / total, 1), "has-text-right"]
           ];
         }),
         {

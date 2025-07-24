@@ -23,7 +23,7 @@
   import _ from "lodash";
   import { onMount } from "svelte";
 
-  import BudgetCard from "$lib/components/BudgetCard.svelte";
+  import BudgetCard from "$lib/components/BudgetCardCustom.svelte";
   import LevelItem from "$lib/components/LevelItem.svelte";
   import ZeroState from "$lib/components/ZeroState.svelte";
   import { MasonryGrid } from "@egjs/svelte-grid";

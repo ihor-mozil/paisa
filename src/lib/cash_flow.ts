@@ -68,6 +68,7 @@ export function renderMonthlyFlow(
 
   const x = d3.scaleBand().range([0, width]).paddingInner(0.1),
     y = d3.scaleLinear().range([height, 0]),
+    y_balance = d3.scaleLinear().range([height, 0]),
     z = d3.scaleOrdinal<string>(colors).domain(areaKeys);
 
   const x1 = d3.scaleBand().domain(["0", "1"]).paddingInner(0.1).paddingOuter(0.1);
@@ -78,6 +79,7 @@ export function renderMonthlyFlow(
     .attr("transform", "translate(0," + height + ")");
 
   const yAxis = g.append("g").attr("class", "axis y");
+  const yAxisRight = g.append("g").attr("class", "axis y").attr("transform", `translate(${width + MAX_BAR_WIDTH},0)`);
 
   const groups = g.append("g");
 
@@ -98,13 +100,21 @@ export function renderMonthlyFlow(
         c.tax +
         (c.investment > 0 ? c.investment : 0) +
         (c.liabilities < 0 ? -c.liabilities : 0),
-      c.balance
+      // c.balance
     ]);
     positions.push(0);
 
+    const positions_balance = _.flatMap(cashFlows, (c) => [
+      c.balance
+    ]);
+    positions_balance.push(0);
+
     x.domain(_.map(cashFlows, (c) => c.date.format("MMM YYYY")));
     y.domain(d3.extent(positions));
+    y_balance.domain(d3.extent(positions_balance))
     x1.range([0, x.bandwidth()]);
+
+    const y_balance_factor = (_.max(positions) - _.min(positions)) / (_.max(positions_balance) - _.min(positions_balance))
 
     const t = svg.transition().duration(firstRender ? 0 : 750);
     firstRender = false;
@@ -127,6 +137,7 @@ export function renderMonthlyFlow(
     }
 
     yAxis.transition(t).call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    yAxisRight.transition(t).call(d3.axisLeft(y_balance).tickSize(-width).tickFormat(formatCurrencyCrude));
 
     const gbars = groups
       .selectAll("g.group")
@@ -220,7 +231,7 @@ export function renderMonthlyFlow(
         .line<CashFlow>()
         .curve(d3.curveMonotoneX)
         .x((c) => x(c.date.format("MMM YYYY")) + x.bandwidth() / 2)
-        .y((c) => y(c.balance))(cashFlows)
+        .y((c) => y(c.balance * y_balance_factor))(cashFlows)
     );
 
     tooltipRects

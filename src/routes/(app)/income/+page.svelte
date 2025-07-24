@@ -8,41 +8,89 @@
     renderYearlyIncomeTimeline,
     renderYearlyTimelineOf
   } from "$lib/income";
-  import { ajax, formatCurrency, type Legend } from "$lib/utils";
+  import { ajax, formatCurrency, type Legend, type Income, type IncomeYearlyCard, type Tax, } from "$lib/utils";
   import _ from "lodash";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
+  import { dateRange, setAllowedDateRange } from "../../../store";
 
   let grossIncome = 0;
   let netTax = 0;
+  let incomes: Income[];
+  let taxes: Tax[];
+  let yearlyCards: IncomeYearlyCard[];
 
   let monthlyInvestmentTimelineLegends: Legend[] = [];
   let yearlyIncomeTimelineLegends: Legend[] = [];
   let yearlyNetIncomeTimelineLegends: Legend[] = [];
   let yearlyNetTaxTimelineLegends: Legend[] = [];
 
-  onMount(async () => {
-    const {
-      income_timeline: incomes,
-      tax_timeline: taxes,
-      yearly_cards: yearlyCards
-    } = await ajax("/api/income");
-    monthlyInvestmentTimelineLegends = renderMonthlyInvestmentTimeline(incomes);
-    yearlyIncomeTimelineLegends = renderYearlyIncomeTimeline(yearlyCards);
-    yearlyNetIncomeTimelineLegends = renderYearlyTimelineOf(
-      "Net Income",
-      "net_income",
-      COLORS.gain,
-      yearlyCards
-    );
-    yearlyNetTaxTimelineLegends = renderYearlyTimelineOf(
-      "Net Tax",
-      "net_tax",
-      COLORS.loss,
-      yearlyCards
-    );
+  const destroy = (): void => {
+    [
+      "d3-income-timeline", 
+      "d3-yearly-income-timeline", 
+      "d3-yearly-net_income-timeline", 
+      "d3-yearly-net_tax-timeline"
+    ].map((id) => {
+      const el = document.getElementById(id)
+      if (el.firstChild) {
+        el.firstChild.remove()
+      }
+    })
+  };
 
-    grossIncome = _.sumBy(incomes, (i) => _.sumBy(i.postings, (p) => -p.amount));
-    netTax = _.sumBy(taxes, (t) => _.sumBy(t.postings, (p) => p.amount));
+  $: {
+    if (!_.isEmpty(incomes)) {
+      destroy();
+
+      const ii = _.filter(
+          incomes,
+          (p) => p.date.isSameOrBefore($dateRange.to) && p.date.isSameOrAfter($dateRange.from)
+        )
+      monthlyInvestmentTimelineLegends = renderMonthlyInvestmentTimeline(ii);
+      grossIncome = _.sumBy(ii, (i) => _.sumBy(i.postings, (p) => -p.amount));
+    }
+    if (!_.isEmpty(yearlyCards)) {
+
+      const yy = _.filter(
+        yearlyCards,
+        (p) => p.end_date.isSameOrAfter($dateRange.from)
+      )
+
+      yearlyIncomeTimelineLegends = renderYearlyIncomeTimeline(yy);
+      yearlyNetIncomeTimelineLegends = renderYearlyTimelineOf(
+        "Net Income",
+        "net_income",
+        COLORS.gain,
+        yy
+      );
+      yearlyNetTaxTimelineLegends = renderYearlyTimelineOf(
+        "Net Tax",
+        "net_tax",
+        COLORS.loss,
+        yy
+      );
+
+    }
+
+    if (!_.isEmpty(taxes)) {
+      const tt =  _.filter(
+          taxes,
+          (p) => p.end_date.isSameOrAfter($dateRange.from)
+        )
+      netTax = _.sumBy(taxes, (t) => _.sumBy(t.postings, (p) => p.amount));
+    }
+  }
+
+  onDestroy(async () => {
+    destroy();
+  });
+
+  onMount(async () => {
+    const data = await ajax("/api/income");
+    incomes = data.income_timeline
+    taxes = data.tax_timeline
+    yearlyCards = data.yearly_cards
+    setAllowedDateRange(_.map(incomes, (p) => p.date));
   });
 </script>
 

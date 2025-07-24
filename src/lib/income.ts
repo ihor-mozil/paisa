@@ -4,6 +4,7 @@ import _ from "lodash";
 import {
   formatCurrency,
   formatCurrencyCrude,
+  formatPercentage,
   type Income,
   type Posting,
   restName,
@@ -142,14 +143,28 @@ function renderIncomeTimeline(incomes: Income[], id: string, timeFormat: string)
       const postings: Posting[] = (d.data as any).postings;
       const total = _.sumBy(postings, (p) => -p.amount);
       return tooltip(
-        _.sortBy(
-          postings.map((p) => [
-            restName(p.account),
-            [formatCurrency(-p.amount), "has-text-weight-bold has-text-right"]
-          ]),
-          (r) => r[0]
-        ),
-        { total: formatCurrency(total) }
+        _.chain(postings)
+      .groupBy((p) => p.account)
+      .map((group, account) => {
+        return {
+          account: account,
+          count: group.length,
+          amount: _.sum(_.map(group, (p) => -p.amount)),
+          pct: _.sum(_.map(group, (p) => -p.amount)) / total
+        };
+      })
+      .sort((p1, p2) => p2.amount - p1.amount)
+      .map((p) => [
+        [p.account, "is-clipped"],
+        [`${p.count}`, "has-text-right"],
+        [formatCurrency(p.amount), "has-text-weight-bold has-text-right"],
+        [formatPercentage(p.pct, 2), "has-text-weight-bold has-text-right"]
+      ])
+      .value(),
+        { 
+          header:  (d.data as any).date.format(timeFormat),
+          total: formatCurrency(total) 
+        }
       );
     })
     .attr("x", function (d) {
@@ -271,17 +286,22 @@ export function renderYearlyIncomeTimeline(yearlyCards: IncomeYearlyCard[]): Leg
     .attr("data-tippy-content", (d) => {
       let grandTotal = 0;
       return tooltip(
-        _.sortBy(
-          groups.flatMap((k) => {
+        _.chain(groups)
+         .flatMap((k) => {
             const total = d.data[k];
-            if (total == 0) {
-              return [];
-            }
             grandTotal += total;
-            return [[k, [formatCurrency(total), "has-text-weight-bold has-text-right"]]];
-          }),
-          (r) => r[0]
-        ),
+            return {
+              account: k,
+              total: total,
+            };
+         })
+         .sort((v1, v2) => v2.total - v1.total)
+         .map((v) => [
+            v.account, 
+            [formatCurrency(v.total), "has-text-weight-bold has-text-right"],
+            [formatPercentage(v.total / grandTotal, 2), "has-text-weight-bold has-text-right"]
+          ])
+         .value(),
         { total: formatCurrency(grandTotal) }
       );
     })
